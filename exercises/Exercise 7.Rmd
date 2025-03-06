@@ -8,7 +8,6 @@ For this exercise, you will practice detecting if there are significant differen
 1. If you need to reload the NHANES data and label the ordinal and nominal variables as factor variables, you should run the code chunk below:
 ```{r}
 #Use this code chunk to download the NHANES 2017-2018 database and to label the nominal and ordinal variables as factor variables (if necessary):
-NHANESdata <- read.csv("https://raw.githubusercontent.com/malenamalka/ANTH241-SP25/refs/heads/main/data/NHANES2017-28")
 factor(c(NHANESdata$Gender, NHANESdata$Race, NHANESdata$HealthIns))
 factor(c(NHANESdata$Education,NHANESdata$HHEducation,NHANESdata$HHIncome,NHANESdata$FeelBad,NHANESdata$HHFoodSec),order=TRUE)
 factor(NHANESdata$BMIcat, order =TRUE, levels = c("Underweight","Healthy","Overweight","Obese"))
@@ -20,25 +19,61 @@ head(NHANESdata)
 library(dplyr)
 library(tidyr)
 library(ggplot2)
-install.packages("dunn.test")
 library(dunn.test)
+library(MASS)
+```
+
+Age by Gender in NHANES Sample
+```{r}
+# histogram of continuous variable:
+
+  hist(NHANESdata$Age)
+#summary
+NHANESdata %>% 
+  drop_na(Age) %>% 
+  group_by(Gender) %>% 
+  summarize(mean(Age), sd(Age), count=n())
+
+
+var.test(Age~Gender, data=NHANESdata, alternative="two.sided")
+
+t.test(Age~Gender, var.equal=TRUE, data=NHANESdata)
+
 ```
 
 3. T-tests compare the variation of a continuous variable across two levels of a categorical (nominal and ordinal) variable. 
+Alternative Hypothesis: Difference
+Null Hypothesis: No difference
 ```{r}
 #3a. What are the means, standard deviations, and counts for BMI by gender?
-
+NHANESdata %>% 
+  drop_na(BMI) %>% 
+  group_by(Gender) %>% 
+  summarize(mean(BMI), sd=sd(BMI), count=n())
 #Let's hypothesize that there is a significant difference in BMI by gender in the NHANES 2017-2018 sample. What is the null hypothesis? What is the alternative hypothesis? We will test this hypothesis using the method shown in S&B, section 7.1.2
+  #Null: There is no significant difference between the mean BMI of male and female individuals in NHANES 2017-18.
+  #Alternative: Female respondents in NHANES 2017-18 sample had a higher mean BMI than their male counterparts. 
 #1. histogram of continuous variable: hist(data$contvar)
-
-#2. F-test to see if the variance in the continuous variable is the same for the different levels of the categorical variable: 
+  hist(NHANESdata$BMI)
+  
+  #2. F-test to see if the variance in the continuous variable is the same for the different levels of the categorical variable: 
 #var.test(Contvar~Catvar, data=, alternative="two.sided")
-
+  var.test(BMI~Gender, data=NHANESdata %>% drop_na(BMI), alternative="two.sided")
+  #p-value: 2.2e-16, non-equal variances
+  
 #3. According to S&B, if the variances are not equal, we should run the T-test anyways: t.test(Contvar~Catvar, var.equal=FALSE, data=)
 
-```
-Question: Does the above T-test support the null hypothesis or the alternative hypothesis?
+t.test(BMI~Gender, var.equal=FALSE, data=NHANESdata %>% 
+         drop_na(BMI))
 
+```
+t-test statistic: higher value= more likely to be significant
+F=degrees of freedom- higher dergree= more precise t-statistic
+p (probability) value- less than or equal to 0.05= significant (indicates 95% chance that the difference is meaningful); if p-value is less than 0.05, the difference is likely insignificant
+our p value= .00000085; the difference is significant. 
+
+Question: Does the above T-test support the null hypothesis or the alternative hypothesis?
+The t-test supports the alternative hypothesis that BMI is significantly (if slightly) different between male and female individuals.
 ```{r}
 #3b: Does the amount of daily sedentary time differ in people with and without health insurance? What is the null hypothesis? What is the alternative hypothesis?
 #1. Find the descriptive statistics (mean, sd, and counts) of BMI by presence/absence of health insurance. 
@@ -46,20 +81,45 @@ Question: Does the above T-test support the null hypothesis or the alternative h
 NHANES_healthins <- NHANESdata%>%
   filter(HealthIns<3)
 NHANES_healthins%>%
-  drop_na(BMI)%>%
+  drop_na(Sedentary)%>%
+  filter(Sedentary<1440) %>% 
   group_by(HealthIns)%>%
-  summarize(mean(BMI), sd(BMI), count=n())
+  summarize(mean(Sedentary), sd(Sedentary), count=n())
+
 #2. Run a test to see if the variances of the continuous variable are equal across different levels of the categorical variable:
 #var.test(Contvar~Catvar, data=, alternative="two.sided")
-
+var.test(Sedentary~HealthIns, data=NHANES_healthins, alternative="two.sided")
+#p>.5; equal variance(=true)
 #3. We will run the T-test with the following code:
 #t.test(Contvar~Catvar, var.equal=TRUE, data=)
+t.test(Sedentary~HealthIns, var.equal=TRUE, data=NHANES_healthins, na.rm=TRUE)
 
 ```
 Does the above T-test support or refute the alternative hypothesis?
+The T-test supports the alternative hypothesis, that there is a significant difference in BMI between people who do nd don't have Health Insurance. the p-value is extremely small(0.0000000000000479!!)
 
 3c. Generate a hypothesis that tests if daily caloric intake differs in people who identify as female from people who identify as male. What are the null and alternative hypotheses? Run a T-test by replicating the methods above. What are your results? Do your results support or refute the alternative hypothesis?
+  Alternative: There is a significant difference in daily caloric intake between males and females.
+  Null: The difference in daily caloric intake is not significant between females and males. 
+  
+```{r}
+NHANESdata %>%
+  drop_na(DR1TKCAL) %>% 
+  group_by(Gender) %>% 
+  summarise(mean(DR1TKCAL), sd(DR1TKCAL), count=n())
+NHANESdata %>%
+  drop_na(DR1TKCAL) %>% 
+  group_by(Gender) %>% 
+  ggplot(aes(x=Gender, y=DR1TKCAL)) + geom_boxplot(color="coral2", fill="cornsilk")
 
+
+#t.test(Contvar~Catvar, var.equal=TRUE, data=)
+#var.test(Contvar~Catvar, data=, alternative="two.sided")
+var.test(DR1TKCAL~Gender, data=NHANESdata, alternative= "two.sided")
+t.test(DR1TKCAL~Gender, var.equal=TRUE, data=NHANESdata, na.rm=TRUE)
+```
+The difference in Daily caloric intake between men and women is significantly different.
+  
 4. Testing for significant differences in a continuous variable across three or more categorical levels. Both S&B and Kabacoff introduce you to analysis of variance (ANOVA) as the statistical method to make these comparisons. What they show you is all good. However, I would like to introduce you to a non-parametric test that is more appropriate to the NHANES data as it applies to variables that are not normally distributed. This method is similar to ANOVA, it is easy to implement, and it provides results that are easy to interpret. 
 
 The non-parametric statistical test that is a substitute for ANOVA is called the Kruskal-Wallis test. It shows if there is a significant difference in the means and variance of a continuous variable across three or more categorical levels when the continuous variable is not normally distributed. After the Kruskal-Wallis test, a post-hoc test called the Dunn Test, identifies the specific bivariate comparisons that significantly differ from each other.
@@ -67,24 +127,81 @@ The non-parametric statistical test that is a substitute for ANOVA is called the
 Here is an example:
 ```{r}
 #4a. Does daily caloric intake differ by BMI categories? What is the null hypothesis? What is the alternative hypothesis?
+    #alternative: Caloric Intake will differ significantly across BMI categories.
+    #Null: Daily caloric Intake will not differ significantly across BMI categories  
 #1. Generate summary statistics of daily caloric intake by BMI cateogories?
-
+NHANESdata %>% 
+  drop_na(DR1TKCAL) %>% 
+  drop_na(BMIcat) %>% 
+  group_by(BMIcat) %>% 
+  summarize(mean(DR1TKCAL), sd(DR1TKCAL), count=n())
 #2. Generate a boxplot of daily caloric intake by BMI categories to visualize the summary statistics
-
+NHANESdata %>% 
+  drop_na(DR1TKCAL) %>% 
+  drop_na(BMIcat) %>% 
+  ggplot(aes(x=BMIcat, y=DR1TKCAL)) + geom_boxplot(color="cadetblue", fill="slategray1") + labs(title="Daily Caloric Intake By BMI Category", x="BMI Category", y="Daily Caloric Intake")
 #3. Run the Kruskal-Wallis test and the post-hoc Dunn test to see if there are any significant differences in daily caloric intake by BMI categories. The code for the Kruskal-Wallis and Dunn test is: 
 #dunn.test(x=data$contvar, g=data$catvar, kw=TRUE)
+NHANESdata %>% 
+  drop_na(DR1TKCAL) %>% 
+  drop_na(BMIcat) %>% 
+  dunn.test(x=NHANESdata$DR1TKCAL, g=NHANESdata$BMIcat, kw=TRUE)
 
 ```
+Upper Number: T-test Value
+Lower Number: P-value
+
 Does the above test support or refute the alternative hypothesis? If it supports the alternative hypothesis, which categorical levels significantly differ from each other? Explain your findings.
+The Kruskal-Wallas and Dunn tests show that the alternative hypothesis is true for the Underweight category, while the other three categories have no signficant difference in caloric intake.
 
 ```{r}
 #4b. Does the ratio of monthly income to poverty differ by the head of household's education level? What is the null hypothesis? What is the alternative hypothesis?
+  #Alternative: 
+  #Null: there is 
 #1. Generate descriptive statistics of RFITP by HHEducation levels?
 
-#2. Run the Kruskal-Wallis and Dunn tests:
+  #NHANESdata %>%
+  #drop_na(RFITP) %>%
+  #group_by(HHEducation) %>% 
+  #summary(mean(RFITP), sd(RFITP), count=n())
+#won't run RFITP Data under a pipe
 
+#2. Run the Kruskal-Wallis and Dunn tests:
+dunn.test(x=NHANESdata$RFITP, g=NHANESdata$HHEducation, kw=TRUE)
 ```
 Explain your results here.
+There is a significant difference in ratio to family poverty between households with different levels of education.
 
 #5. Run your own Kruskal-Wallis and Dunn test below based on comparing a continuous variable across a nominal or ordinal variable with three or more levels. Show your work in the code chunk and interpret your findings.
 
+```{r}
+#Coninuous Variable: Sedentary
+#Ordinal Variable: BMIcat
+#Null Hypothesis: There is no significant difference in mean sedentary minutes per day between different BMI categories. 
+#Alternative Hypothesis: Different BMI categories will show significantly different mean sedentary minutes per day.
+
+NHANESdata %>% 
+  drop_na(BMIcat) %>% 
+  drop_na(Sedentary) %>% 
+  filter(Sedentary<1440) %>% 
+  group_by(BMIcat) %>% 
+  summarize(mean(Sedentary), sd(Sedentary), count=n())
+
+NHANESdata %>% 
+  drop_na(BMIcat) %>% 
+  drop_na(Sedentary) %>% 
+  filter(Sedentary<1440) %>% 
+  group_by(BMIcat) %>% 
+  ggplot(aes(x=BMIcat, y=Sedentary)) + geom_boxplot(color="steelblue4", fill="darkseagreen2", alpha=.85)
+
+nhanessedentary<- NHANESdata %>% 
+  drop_na(BMIcat) %>% 
+  drop_na(Sedentary) %>% 
+  filter(Sedentary<1440)
+  dunn.test(x=nhanessedentary$Sedentary, g=nhanessedentary$BMIcat, kw=TRUE)
+
+
+```
+
+Between the Healthy and Obese categories, and Obese and Overweight, the alternative hypothesis is true;the number of minutes spent sedentary per day is not  different.
+Between all other categories, however, the null hypothesis was correct: there is no significant difference in sedentary minutes between overweight and healthy individuals, or between Underweight and all other categories.
